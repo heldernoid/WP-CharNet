@@ -1,0 +1,446 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>WP-CharNet</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: a lab notebook page. Writing pad on the left, the ranked answer on the right,
+   then the evidence (maps, the winning rule, referees) and how far to trust it. */
+:root {
+  --paper: #f3f5f8;      /* page: cool notebook grey */
+  --sheet: #ffffff;      /* the pad and panels */
+  --ink: #18202e;        /* text and pen */
+  --muted: #5b6474;
+  --rule: #dce1e9;       /* grid lines, borders */
+  --accent: #2443c4;     /* ink blue: evidence for, the answer */
+  --accent-soft: #e5eafb;
+  --against: #b23a2e;    /* evidence against */
+  --map-ink: #c3cad6;    /* faint strokes under a feature map */
+  --f-display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --f-body: "Atkinson Hyperlegible", "Verdana", system-ui, sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --s-1: 0.8125rem; --s0: 1rem; --s1: 1.25rem; --s2: 1.75rem; --s3: 2.6rem;
+  --r: 10px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0f131a; --sheet: #161b24; --ink: #e5e9f0; --muted: #98a1b0; --rule: #29303c;
+    --accent: #8fa3ff; --accent-soft: #1d2643; --against: #ff8b7d; --map-ink: #39414f; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0f131a; --sheet: #161b24; --ink: #e5e9f0; --muted: #98a1b0; --rule: #29303c;
+  --accent: #8fa3ff; --accent-soft: #1d2643; --against: #ff8b7d; --map-ink: #39414f; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--paper); color: var(--ink); font: 400 var(--s0)/1.55 var(--f-body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 56px;
+}
+.wrap { max-width: 1100px; margin: 0 auto; display: grid; gap: 28px; }
+h1, h2, h3 { font-family: var(--f-display); text-wrap: balance; margin: 0; letter-spacing: -0.01em; }
+h1 { font-size: var(--s3); font-weight: 800; line-height: 1; }
+h2 { font-size: var(--s1); font-weight: 600; }
+h3 { font-size: var(--s0); font-weight: 600; }
+p { margin: 0; max-width: 66ch; }
+code, .mono { font-family: var(--f-mono); font-size: 0.86em; }
+.eyebrow { font: 600 var(--s-1)/1 var(--f-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.muted { color: var(--muted); }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+header { display: grid; gap: 12px; }
+.title-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px 16px; }
+.chip { font: 600 var(--s-1)/1 var(--f-mono); padding: 6px 9px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); }
+.gh { margin-left: auto; align-self: center; display: inline-flex; align-items: center; gap: 8px; padding: 7px 14px; border: 1px solid var(--rule);
+  border-radius: 999px; background: var(--sheet); color: var(--ink); text-decoration: none; font-size: var(--s-1); font-weight: 700; }
+.gh:hover { border-color: var(--accent); color: var(--accent); }
+.gh svg { width: 18px; height: 18px; fill: currentColor; flex: none; }
+header p { font-size: var(--s1); line-height: 1.4; }
+#status { font-size: var(--s-1); }
+
+.panel { background: var(--sheet); border: 1px solid var(--rule); border-radius: var(--r); padding: 20px; display: grid; gap: 14px; align-content: start; min-width: 0; }
+.main { display: grid; grid-template-columns: minmax(0, 400px) minmax(0, 1fr); gap: 20px; }
+@media (max-width: 780px) { .main { grid-template-columns: minmax(0, 1fr); } }
+
+/* the pad */
+.pad-box { position: relative; width: 100%; aspect-ratio: 1; max-width: 100%; border-radius: 8px; overflow: hidden;
+  border: 1px solid var(--rule); touch-action: none; cursor: crosshair;
+  background-color: var(--sheet);
+  background-image: linear-gradient(var(--rule) 1px, transparent 1px), linear-gradient(90deg, var(--rule) 1px, transparent 1px);
+  background-size: calc(100% / 14) calc(100% / 14); background-position: -1px -1px; }
+#pad { position: absolute; inset: 0; width: 100%; height: 100%; }
+.pad-note { position: absolute; left: 10px; bottom: 8px; font-size: var(--s-1); color: var(--muted); pointer-events: none;
+  background: var(--sheet); padding: 2px 6px; border-radius: 4px; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.btn { border: 1px solid var(--rule); background: var(--sheet); padding: 7px 14px; border-radius: 999px; cursor: pointer; }
+.btn:hover { border-color: var(--accent); color: var(--accent); }
+.btn[disabled] { opacity: .45; cursor: default; border-color: var(--rule); color: inherit; }
+
+/* what the network sees */
+.maps { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+.map { display: grid; gap: 4px; justify-items: start; min-width: 0; }
+.map canvas { width: 100%; aspect-ratio: 1; image-rendering: pixelated; border-radius: 4px; border: 1px solid var(--rule); background: var(--sheet); }
+.map span { font: 400 0.72rem/1.25 var(--f-mono); color: var(--muted); overflow-wrap: anywhere; }
+
+/* ranking */
+.seg { display: inline-flex; border: 1px solid var(--rule); border-radius: 999px; padding: 3px; gap: 2px; background: var(--paper); }
+.seg button { border: 0; background: transparent; padding: 6px 12px; border-radius: 999px; cursor: pointer; color: var(--muted); }
+.seg button[aria-pressed="true"] { background: var(--sheet); color: var(--ink); box-shadow: 0 0 0 1px var(--rule); }
+.answer { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+.answer .big { font: 700 4.4rem/1 var(--f-body); color: var(--accent); min-width: 1.1em; text-align: center; }
+.answer .says { font-size: var(--s1); line-height: 1.35; }
+.answer .says b { font-variant-numeric: tabular-nums; }
+ol.rank { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+ol.rank li { display: grid; grid-template-columns: 2.2rem minmax(0, 7.5rem) minmax(0, 1fr) 4.2rem; align-items: center; gap: 10px; padding: 3px 4px; border-radius: 6px; }
+ol.rank li:first-child { background: var(--accent-soft); }
+.glyph { font: 700 1.45rem/1 var(--f-body); text-align: center; }
+.kind { font-size: var(--s-1); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bar { height: 10px; background: var(--paper); border-radius: 0 4px 4px 0; overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--accent); border-radius: 0 4px 4px 0; min-width: 2px; }
+.pct { text-align: right; font-variant-numeric: tabular-nums; font-family: var(--f-mono); font-size: var(--s-1); }
+.reliab { font-size: var(--s-1); background: var(--paper); border-radius: 6px; padding: 8px 10px; max-width: none; }
+.reliab:empty { display: none; }
+.reliab b { font-variant-numeric: tabular-nums; }
+.vtext { display: grid; gap: 10px; }
+.vtext p { font-size: var(--s-1); }
+.note { font-size: var(--s-1); color: var(--muted); border-left: 2px solid var(--rule); padding-left: 10px; }
+
+/* why */
+.why { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 20px; }
+@media (max-width: 780px) { .why { grid-template-columns: minmax(0, 1fr); } }
+.rule-src { font: 400 0.8rem/1.5 var(--f-mono); background: var(--paper); border-radius: 6px; padding: 10px 12px; overflow-wrap: anywhere; color: var(--muted); }
+.rule-src b { color: var(--ink); font-weight: 600; }
+.terms { display: grid; gap: 3px; }
+.term { display: grid; grid-template-columns: minmax(0, 9.5rem) minmax(0, 1fr) 3.6rem; gap: 10px; align-items: center; }
+.term .n { font: 400 0.8rem/1.2 var(--f-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.term .v { font: 400 0.8rem/1 var(--f-mono); text-align: right; font-variant-numeric: tabular-nums; }
+.dbar { position: relative; height: 10px; }
+.dbar::before { content: ""; position: absolute; left: 50%; top: -3px; bottom: -3px; width: 1px; background: var(--rule); }
+.dbar i { position: absolute; top: 0; height: 100%; }
+.dbar i.pos { left: 50%; background: var(--accent); border-radius: 0 3px 3px 0; }
+.dbar i.neg { right: 50%; background: var(--against); border-radius: 3px 0 0 3px; }
+.sum { font: 400 var(--s-1)/1.5 var(--f-mono); border-top: 1px solid var(--rule); padding-top: 8px; overflow-wrap: anywhere; }
+.refs { display: grid; gap: 12px; }
+.ref { display: grid; gap: 4px; padding-bottom: 12px; border-bottom: 1px solid var(--rule); }
+.ref:last-child { border-bottom: 0; padding-bottom: 0; }
+.ref .head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 10px; font-weight: 700; }
+.ref .head .mono { font-weight: 400; color: var(--accent); min-width: 0; overflow-wrap: anywhere; }
+.ref p { font-size: var(--s-1); color: var(--muted); }
+
+/* trust */
+.trust { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+@media (max-width: 900px) { .trust { grid-template-columns: minmax(0, 1fr); } }
+table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; font-size: var(--s-1); }
+th, td { text-align: left; padding: 6px 8px 6px 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-weight: 700; color: var(--muted); }
+td.num, th.num { text-align: right; font-family: var(--f-mono); }
+.tbl { overflow-x: auto; }
+footer { font-size: var(--s-1); color: var(--muted); display: grid; gap: 6px; }
+@media (prefers-reduced-motion: no-preference) { .bar i, .dbar i { transition: width .15s ease-out; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="title-row">
+      <h1>WP-CharNet</h1>
+      <span class="chip">hand-written weights · no training</span>
+      <a class="gh" href="https://github.com/heldernoid/WP-CharNet" target="_blank" rel="noopener" aria-label="WP-CharNet on GitHub">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z"/></svg>
+        <span>GitHub</span>
+      </a>
+    </div>
+    <p>Write a digit or a letter. A small network reads it with weights that were typed by hand, one reason per line. Nothing was trained or fine-tuned.</p>
+    <div id="status" class="muted" role="status">Loading the edit list…</div>
+  </header>
+
+  <div class="main">
+    <section class="panel" aria-labelledby="h-pad">
+      <div class="row" style="justify-content: space-between">
+        <h2 id="h-pad">Write here</h2>
+        <div class="row">
+          <button class="btn" id="undo" type="button">Undo stroke</button>
+          <button class="btn" id="clear" type="button">Clear</button>
+        </div>
+      </div>
+      <div class="pad-box" id="padbox">
+        <canvas id="pad" aria-label="Writing pad: draw one character with the mouse, a finger or a pen"></canvas>
+        <div class="pad-note" id="padnote">Example: a 3 from the test drawings. Clear it and write your own.</div>
+      </div>
+      <div class="eyebrow">What the network sees (28 × 28)</div>
+      <div class="maps" id="maps"></div>
+    </section>
+
+    <section class="panel" aria-labelledby="h-rank">
+      <div class="row" style="justify-content: space-between">
+        <h2 id="h-rank">What it thinks</h2>
+        <div class="seg" role="group" aria-label="Which classes to rank">
+          <button type="button" id="m-all" aria-pressed="false">All 62</button>
+          <button type="button" id="m-dig" aria-pressed="true">Digits only</button>
+          <button type="button" id="m-let" aria-pressed="false">Letters only</button>
+        </div>
+      </div>
+      <div class="answer" id="answer"></div>
+      <p class="reliab" id="reliab"></p>
+      <ol class="rank" id="rank"></ol>
+      <div class="row"><button class="btn" id="more" type="button">Show all 62</button></div>
+      <p class="note" id="modenote"></p>
+    </section>
+  </div>
+
+  <section class="panel" aria-labelledby="h-why">
+    <h2 id="h-why">Why</h2>
+    <div class="why">
+      <div style="display: grid; gap: 12px; align-content: start; min-width: 0">
+        <h3 id="style-h">The winning style rule</h3>
+        <div class="rule-src" id="rule-src"></div>
+        <div class="terms" id="terms"></div>
+        <div class="sum" id="sum"></div>
+      </div>
+      <div style="display: grid; gap: 12px; align-content: start; min-width: 0">
+        <h3>Referees that spoke</h3>
+        <p class="muted" style="font-size: var(--s-1)">A referee is a hand-written judge for one pair of look-alike classes. It speaks only while both are within 1.5 points of the top score.</p>
+        <div class="refs" id="refs"></div>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-trust" style="display: grid; gap: 14px">
+    <h2 id="h-trust">How far to trust it</h2>
+    <div class="trust">
+      <div class="panel"><h3 id="scores-h">Scores</h3><div id="scores" class="vtext"></div></div>
+      <div class="panel"><h3>Are the percentages honest?</h3><div id="calib" class="vtext"></div></div>
+      <div class="panel"><h3 id="vnotes-h">How it was made</h3><div id="vnotes" class="vtext"></div></div>
+    </div>
+  </section>
+
+  <footer>
+    <p>The page runs the plain-text edit list and architecture directly: it starts every parameter at zero and applies the edits in the browser. Your drawing never leaves this page.</p>
+    <p>Drawing pipeline: strokes are redrawn with a pen 12% of the character's height, the bounding box is fitted into 20 × 20, and the centre of mass is moved to the centre, as MNIST was made.</p>
+    <p>Percentages: a softmax of the class scores with temperature 0.5, typed by hand and never fitted. The "shown vs right" figures are measured on training images never looked at while writing the weights (MNIST train 6,000–9,000; EMNIST Letters train 60,000–65,200).</p>
+  </footer>
+</div>
+
+<script src="charnet.js"></script>
+<script>
+(() => {
+  "use strict";
+  const $ = id => document.getElementById(id);
+  const EXAMPLE = [  // dev set "3/round" (gen/handwriting.py), sampled from its two arcs
+    arc(.28, .25, .27, .25, 150, -90), arc(.28, .74, .3, .26, 90, -150)];
+  function arc(cx, cy, rx, ry, a0, a1) {
+    const n = Math.max(8, Math.round(Math.abs(a1 - a0) / 8)), p = [];
+    for (let k = 0; k < n; k++) { const a = (a0 + (a1 - a0) * k / (n - 1)) * Math.PI / 180; p.push([cx + rx * Math.cos(a), cy - ry * Math.sin(a)]); }
+    return p;
+  }
+
+  let net = null, strokes = [], cur = null, mode = "digits", showAll = false, pending = false, example = true;
+  let rel = null;
+  const pct = v => Math.round(v * 100) + "%";
+  const KIND = c => /[0-9]/.test(c) ? "digit" : /[A-Z]/.test(c) ? "capital letter" : "small letter";
+
+  // ---- colours from the theme tokens ----
+  function tok(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+  function rgb(hex) { const h = hex.replace("#", ""); return [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16)); }
+
+  // ---- pad ----
+  const pad = $("pad"), ctx = pad.getContext("2d");
+  function sizePad() {
+    const r = pad.getBoundingClientRect(), d = window.devicePixelRatio || 1;
+    pad.width = Math.round(r.width * d); pad.height = Math.round(r.height * d); drawPad();
+  }
+  function drawPad() {
+    const w = pad.width;
+    ctx.clearRect(0, 0, w, w);
+    ctx.strokeStyle = ctx.fillStyle = tok("--ink"); ctx.lineWidth = w * 0.045; ctx.lineCap = ctx.lineJoin = "round";
+    for (const s of strokes) {
+      ctx.beginPath();
+      if (s.length === 1) { ctx.arc(s[0][0] * w, s[0][1] * w, ctx.lineWidth / 2, 0, 7); ctx.fill(); continue; }
+      s.forEach(([x, y], i) => i ? ctx.lineTo(x * w, y * w) : ctx.moveTo(x * w, y * w));
+      ctx.stroke();
+    }
+  }
+  function at(e) { const r = pad.getBoundingClientRect(); return [(e.clientX - r.left) / r.width, (e.clientY - r.top) / r.width]; }
+  pad.addEventListener("pointerdown", e => {
+    if (example) { strokes = []; example = false; $("padnote").hidden = true; }
+    pad.setPointerCapture(e.pointerId); cur = [at(e)]; strokes.push(cur); drawPad(); schedule();
+  });
+  pad.addEventListener("pointermove", e => {
+    if (!cur) return;
+    for (const ev of (e.getCoalescedEvents ? e.getCoalescedEvents() : [e])) cur.push(at(ev));
+    drawPad(); schedule();
+  });
+  const end = () => { cur = null; schedule(); };
+  pad.addEventListener("pointerup", end); pad.addEventListener("pointercancel", end);
+  $("clear").onclick = () => { strokes = []; example = false; $("padnote").hidden = true; drawPad(); schedule(); };
+  $("undo").onclick = () => { strokes.pop(); drawPad(); schedule(); };
+  new ResizeObserver(sizePad).observe($("padbox"));
+
+  // ---- mode ----
+  function setMode(m) {
+    mode = m;
+    [["m-all", "all"], ["m-dig", "digits"], ["m-let", "letters"]].forEach(([id, v]) => $(id).setAttribute("aria-pressed", m === v));
+    trust(); schedule();
+  }
+  $("m-all").onclick = () => setMode("all"); $("m-dig").onclick = () => setMode("digits"); $("m-let").onclick = () => setMode("letters");
+  $("more").onclick = () => { showAll = !showAll; schedule(); };
+
+  function schedule() { if (!pending) { pending = true; requestAnimationFrame(() => { pending = false; run(); }); } }
+
+  // ---- feature maps ----
+  const MAPS = [
+    ["input", T => T.x, "x"],
+    ["holes", T => T.hole, "hole"],
+    ["stroke ends", T => maxOf(T, ["end_up", "end_down", "end_left", "end_right", "end_ul", "end_ur", "end_dl", "end_dr"]), "end_*"],
+    ["junctions", T => maxOf(T, ["junction", "crossing"]), "junction"],
+    ["bays", T => maxOf(T, ["bay_L", "bay_R", "bay_U", "bay_D"]), "bay_*"],
+  ];
+  function maxOf(T, names) { const r = new Float64Array(784); for (const n of names) T[n].forEach((v, i) => { if (v > r[i]) r[i] = v; }); return r; }
+  $("maps").innerHTML = MAPS.map(([label, , name], i) => `<div class="map"><canvas width="28" height="28" id="map${i}"></canvas><span>${label}<br>${name}</span></div>`).join("");
+  function drawMaps(T) {
+    const ink = rgb(tok("--ink")), faint = rgb(tok("--map-ink")), acc = rgb(tok("--accent")), bg = rgb(tok("--sheet"));
+    MAPS.forEach(([, f], i) => {
+      const c = $("map" + i).getContext("2d"), img = c.createImageData(28, 28), m = T ? f(T) : null;
+      for (let p = 0; p < 784; p++) {
+        const x = T ? T.x[p] : 0, v = m ? Math.min(1, Math.max(0, m[p])) : 0;
+        let col = bg.map((b, k) => b + (( i === 0 ? ink : faint)[k] - b) * x);
+        if (i > 0) col = col.map((b, k) => b + (acc[k] - b) * v);
+        img.data.set([...col.map(Math.round), 255], p * 4);
+      }
+      c.putImageData(img, 0, 0);
+    });
+  }
+
+  // ---- run ----
+  function fmtPct(p) { return p >= 0.995 ? ">99%" : p < 0.001 ? "<0.1%" : p < 0.1 ? (p * 100).toFixed(1) + "%" : Math.round(p * 100) + "%"; }
+  function esc(s) { return s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]); }
+
+  function run() {
+    $("undo").disabled = !strokes.length || example; $("clear").disabled = !strokes.length;
+    if (!net) return;
+    if (!strokes.length) { empty(); return; }
+    const T = net.forward(CharNet.fromStrokes(strokes));
+    const classes = net.arch.classes, all = net.scores(T);
+    const idx = classes.map((_, i) => i).filter(i => mode === "all" || (mode === "digits") === (i < 10));
+    // "Digits only" / "Letters only" read the dig:* / let:* outputs, which hear only referees within that kind
+    const view = i => mode === "all" ? all[i] : T[(mode === "digits" ? "dig:" : "let:") + classes[i]];
+    const p = CharNet.probabilities(idx.map(view));
+    const ranked = idx.map((ci, k) => ({ c: classes[ci], p: p[k], s: view(ci) })).sort((a, b) => b.p - a.p);
+    drawMaps(T);
+    const top = ranked[0], second = ranked[1];
+    $("answer").innerHTML = `<div class="big" aria-hidden="true">${esc(top.c)}</div><div class="says">Most likely the ${KIND(top.c)} <b>${esc(top.c)}</b>, at <b>${fmtPct(top.p)}</b>.<br><span class="muted">Next: ${esc(second.c)} at ${fmtPct(second.p)}.</span></div>`;
+    $("reliab").innerHTML = reliability(top);
+    const shown = showAll ? ranked : ranked.slice(0, 8), maxP = ranked[0].p;
+    $("rank").innerHTML = shown.map(r => `<li><span class="glyph">${esc(r.c)}</span><span class="kind">${KIND(r.c)}</span><span class="bar"><i style="width:${(r.p / maxP * 100).toFixed(1)}%"></i></span><span class="pct">${fmtPct(r.p)}</span></li>`).join("");
+    $("more").textContent = showAll ? "Show top 8" : `Show all ${ranked.length}`;
+    $("modenote").textContent = mode === "digits" ? "Ranked as if you wrote a digit."
+      : mode === "letters" ? "Ranked as if you wrote a letter. Capital and small forms are listed separately; where they look the same (c and C, o and O) they share the probability."
+      : "With all 62 classes in play many score close together, so every percentage runs low. The line above says how often answers at this level were right.";
+    why(T, top.c, ranked.slice(0, 2).map(r => r.c));
+  }
+
+  // How often answers shown at this level were right, on handwriting never looked at while writing the weights.
+  function reliability(top) {
+    if (!rel) return "";
+    const kind = /[0-9]/.test(top.c) ? "digits" : "letters";
+    const list = mode === "all" ? rel.all[kind] : rel[mode][mode];
+    if (!list || !list.length) return "";
+    const b = list.find(x => top.p >= x.lo && top.p < x.hi) || list.reduce((a, x) => (Math.abs(x.shown - top.p) < Math.abs(a.shown - top.p) ? x : a));
+    const what = kind === "digits" ? "digit images (MNIST)" : "letter images (EMNIST)";
+    return `When the network showed its top answer at ${pct(b.lo)}–${pct(b.hi)}, it was right <b>${pct(b.right)}</b> of the time (${b.n.toLocaleString()} unseen ${what}).`;
+  }
+
+  function calibTable(list, title) {
+    if (!list || !list.length) return "";
+    return `<p class="muted">${title}</p><div class="tbl"><table><thead><tr><th>It showed</th><th class="num">It was right</th><th class="num">Images</th></tr></thead><tbody>` +
+      list.map(x => `<tr><td>${pct(x.lo)}–${pct(x.hi)} (avg ${pct(x.shown)})</td><td class="num">${pct(x.right)}</td><td class="num">${x.n.toLocaleString()}</td></tr>`).join("") +
+      `</tbody></table></div>`;
+  }
+
+  function trust() {
+    if (!rel) return;
+    const A = rel.accuracy, MODE = { all: "All 62", digits: "Digits only", letters: "Letters only" }[mode];
+    $("calib").innerHTML = (mode === "all"
+      ? calibTable(rel.all.digits, "All 62, on unseen digit images") + calibTable(rel.all.letters, "All 62, on unseen letter images")
+      : calibTable(rel[mode][mode], `${MODE}, on unseen ${mode === "digits" ? "digit" : "letter"} images`)) +
+      `<p class="muted">If the percentages were honest, the two columns would match. Where "right" is higher, the network is more often right than it says.</p>`;
+    const unseen = `<div class="tbl"><table><thead><tr><th>Unseen training images</th><th class="num">Own kind only</th><th class="num">All 62</th></tr></thead><tbody>
+      <tr><td>Digits<br><span class="muted">MNIST train 6,000–9,000</span></td><td class="num">${(A.digits_only * 100).toFixed(1)}%</td><td class="num">${(A.digits_all62 * 100).toFixed(1)}%</td></tr>
+      <tr><td>Letters, either case<br><span class="muted">EMNIST Letters train 60,000–65,200</span></td><td class="num">${(A.letters_only * 100).toFixed(1)}%</td><td class="num">${(A.letters_all62 * 100).toFixed(1)}%</td></tr>
+      </tbody></table></div>`;
+    $("scores-h").textContent = "Scores";
+    $("scores").innerHTML = unseen + `<p class="muted">Training images set aside and never looked at while writing the weights. No test split has been run on these weights.</p>`;
+    $("vnotes").innerHTML = `<p>Claude Opus 5.5 wrote the weights, going through the alphabet one letter at a time, capital and small, on MNIST and EMNIST training images: what each character is mistaken for, which features separate it, and what was missing. That gave position-free neurons (a stem beside a bowl, ascenders and descenders, diagonal stroke counts), whole-letter neurons (a_body, B_body, E_arms, S_body and others) and 307 pair referees, each with its reason. A class drops only by its strongest referee loss.</p>
+        <p>Strongest letters: C, P, X, Z, w, m, d (about 85-93%). Weakest: D (its stem often overshoots into a P or b shape), q and g (look like each other and like 9), and plain sticks (I, l, 1 look the same).</p>`;
+  }
+
+  function empty() {
+    drawMaps(null); $("reliab").innerHTML = "";
+    $("answer").innerHTML = `<div class="says muted">Write one character on the pad: a digit, a capital or a small letter.</div>`;
+    $("rank").innerHTML = ""; $("modenote").textContent = ""; $("rule-src").textContent = "The rule that wins will appear here, with each feature's part in the score.";
+    $("terms").innerHTML = ""; $("sum").textContent = ""; $("refs").innerHTML = ""; $("style-h").textContent = "The winning style rule";
+  }
+
+  function why(T, c, top2) {
+    // which handwriting style won for this class (L10 maxout)
+    const styles = net.L.L10.groups["best:" + c], style = styles.reduce((a, b) => (T[b] > T[a] ? b : a));
+    $("style-h").textContent = `The winning style rule: ${style.slice(2)}`;
+    const src = (net.why["L9 " + style] || "").replace(/^[^:]+:\s*/, "");
+    const [pos, neg] = src.split("|").map(s => (s || "").trim());
+    $("rule-src").innerHTML = `<b>expects</b> ${esc(pos || "—")}<br><b>contradicted by</b> ${esc(neg || "—")}<br><span>(*w = weight, ? = small tie-break bonus)</span>`;
+    const terms = net.terms("L9", style, T).filter(([, w, v]) => Math.abs(w * v) >= 0.01).slice(0, 12);
+    const m = Math.max(0.3, ...terms.map(([, w, v]) => Math.abs(w * v)));
+    $("terms").innerHTML = terms.map(([n, w, v]) => {
+      const e = w * v, wd = (Math.abs(e) / m * 50).toFixed(1);
+      return `<div class="term"><span class="n" title="${esc(n)}: weight ${w.toFixed(2)} × value ${v.toFixed(2)}">${esc(n)}</span><span class="dbar"><i class="${e >= 0 ? "pos" : "neg"}" style="width:${wd}%"></i></span><span class="v">${e >= 0 ? "+" : "−"}${Math.abs(e).toFixed(2)}</span></div>`;
+    }).join("") || `<p class="muted">No feature moved this rule by more than 0.01.</p>`;
+    // referee part of the class score: each referee's verdict is a neuron say:x>y, and a class drops by
+    // 1.5 x its strongest single loss (loss:c); the winner of a pair keeps its score
+    const refSum = T["cls:" + c] - T["best:" + c], spoke = [];
+    for (const name of net.L.L11.out) {
+      const [a, b] = name.slice(4).split(">");
+      const say = T["say:" + a + ">" + b];
+      if (!(say > 0.01)) continue;
+      const ea = 0, eb = -1.5 * say;
+      const strongest = Math.abs(say - T["loss:" + b]) < 1e-9;
+      if (top2.includes(a) || top2.includes(b)) spoke.push({ a, b, ea, eb, strongest, size: Math.abs(ea) + Math.abs(eb), why: net.why["L11 " + name] || net.why["L11 pro:" + b + ">" + a] || "" });
+    }
+    $("sum").textContent = `cls:${c} = ${style} ${T[style].toFixed(2)}  +  referees ${refSum >= 0 ? "+" : "−"}${Math.abs(refSum).toFixed(2)}  =  ${T["cls:" + c].toFixed(2)}`;
+    spoke.sort((x, y) => y.size - x.size);
+    const sgn = v => (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(2);
+    $("refs").innerHTML = spoke.slice(0, 6).map(r => `<div class="ref"><div class="head"><span>${esc(r.a)} over ${esc(r.b)}</span><span class="mono">${[Math.abs(r.ea) > 0.005 ? `${sgn(r.ea)} to ${esc(r.a)}` : "", `${sgn(r.eb)} to ${esc(r.b)}${r.strongest ? " (its strongest loss, counted)" : " (not its strongest, not counted)"}`].filter(Boolean).join(", ")}</span></div><p>${esc(r.why.replace(/^[^:]+:\s*/, ""))}</p></div>`).join("")
+      || `<p class="muted">None: no look-alike pair involving the top two answers was close enough.</p>`;
+  }
+
+  // ---- load the weights: the plain-text edit list, applied to a network that starts at zero ----
+  Promise.all([fetch("model/arch.json").then(r => r.json()), fetch("model/charnet.edits").then(r => r.text()),
+               fetch("model/reliability.json").then(r => r.json()).catch(() => null)])
+    .then(([arch, edits, r]) => {
+      const t0 = performance.now();
+      net = new CharNet.Net(arch).applyEdits(edits);
+      rel = r;
+      const lines = edits.split("\n").filter(l => l.split("#")[0].trim()).length;
+      $("status").textContent = `Loaded ${lines.toLocaleString()} hand-written edit lines in ${Math.round(performance.now() - t0)} ms. Everything runs in your browser.`;
+      trust(); schedule();
+    })
+    .catch(e => { $("status").textContent = "Could not load the weights (" + e.message + "). Serve this folder over http, for example with: python3 -m http.server"; });
+
+  strokes = EXAMPLE.map(s => s.map(([x, y]) => [0.34 + x * 0.55, 0.07 + y * 0.7]));
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { drawPad(); schedule(); });
+  new MutationObserver(() => { drawPad(); schedule(); }).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+  empty(); sizePad(); run();
+})();
+</script>
+</body>
+</html>
