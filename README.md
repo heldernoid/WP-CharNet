@@ -1,4 +1,8 @@
-# WP-CharNet
+<p align="center">
+  <img src="web/apple-touch-icon.png" width="96" height="96" alt="WP-CharNet logo">
+</p>
+<h1 align="center">WP-CharNet</h1>
+<p align="center"><em>A character classifier whose weights were written by hand</em><br><a href="https://heldernoid.github.io/WP-CharNet/">heldernoid.github.io/WP-CharNet</a></p>
 
 A handwritten-character classifier for 62 classes (0–9, A–Z, a–z) whose weights were **written by hand**, not
 trained. Every nonzero parameter comes from one line of a plain-text edit list, and every map, feature and neuron
@@ -11,8 +15,9 @@ hand-written readout (zone features, one neuron per handwriting style, and pairw
 characters).
 
 **Try it:** [heldernoid.github.io/WP-CharNet](https://heldernoid.github.io/WP-CharNet/): draw a character and see every
-class ranked by probability, the feature maps, and the rule and referees behind the answer. It runs entirely in
-the browser.
+class ranked by probability (**Try it**); the feature maps, the winning rule and the referees behind the answer
+(**Inside the network**); the measured accuracy and how honest the percentages are (**How far to trust it**); and
+how the weights were written (**How it's made**). It runs entirely in the browser.
 
 ![WP-CharNet demo: characters drawn on the pad, ranked by the network](demo.gif)
 
